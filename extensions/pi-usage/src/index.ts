@@ -23,6 +23,7 @@
  *   codex-query.ts        queryViaPiAuth + queryCodexUsageWithFallback
  *   anthropic-auth.ts     resolve Pi Anthropic OAuth auth headers
  *   anthropic-query.ts    queryAnthropicUsage + fetchRawUsagePayloads (--raw)
+ *   ratelimit-headers.ts  Anthropic limits from response headers (Claude via a proxy provider)
  *   query.ts              queryUsage, queryAllUsage, queryUsageWithRetries
  *   format.ts             usage report/statusline formatting and display notifications
  *   footer.ts             custom footer with right-aligned usage status
@@ -33,6 +34,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { registerUsageCommand } from "./command.js";
 import { installUsageFooter } from "./footer.js";
 import { isUsageSupportedModel } from "./models.js";
+import { headerReportFor, parseAnthropicRatelimitHeaders, rememberHeaderReport } from "./ratelimit-headers.js";
 import { createUsageStatusline } from "./statusline.js";
 
 export { completeCodexStatusArguments, parseArgs } from "./args.js";
@@ -59,6 +61,7 @@ export default function usageExtension(pi: ExtensionAPI) {
     refreshCurrentUsageStatusline,
     rethrowUnlessStaleContextError,
     setSessionActive,
+    showHeaderReport,
   } = statusline;
   // The TUI drops extension footers when it replaces the session (/new, /resume),
   // so the flag belongs to this session's instance.
@@ -76,30 +79,41 @@ export default function usageExtension(pi: ExtensionAPI) {
     }
   };
 
+  const showUsageForModel = (ctx: ExtensionContext, model: ExtensionContext["model"]) => {
+    if (isUsageSupportedModel(model)) {
+      void refreshCurrentUsageStatusline(ctx, model).catch(rethrowUnlessStaleContextError(ctx));
+      return;
+    }
+    // Other providers: the last limits seen in their response headers, if any.
+    const report = headerReportFor(model?.provider);
+    if (report) showHeaderReport(ctx, report);
+    else clearUsageStatusline(ctx);
+  };
+
   pi.on("session_start", (_event, ctx) => {
     setSessionActive(true);
     ensureUsageFooter(ctx);
-    if (isUsageSupportedModel(ctx.model)) {
-      void refreshCurrentUsageStatusline(ctx, ctx.model).catch(rethrowUnlessStaleContextError(ctx));
-    } else {
-      clearUsageStatusline(ctx);
-    }
+    showUsageForModel(ctx, ctx.model);
   });
 
   pi.on("session_tree", (_event, ctx) => {
-    if (isUsageSupportedModel(ctx.model)) {
-      void refreshCurrentUsageStatusline(ctx, ctx.model).catch(rethrowUnlessStaleContextError(ctx));
-    } else {
-      clearUsageStatusline(ctx);
-    }
+    showUsageForModel(ctx, ctx.model);
   });
 
   pi.on("model_select", (event, ctx) => {
-    if (isUsageSupportedModel(event.model)) {
-      void refreshCurrentUsageStatusline(ctx, event.model).catch(rethrowUnlessStaleContextError(ctx));
-    } else {
-      clearUsageStatusline(ctx);
-    }
+    showUsageForModel(ctx, event.model);
+  });
+
+  // Claude through a proxy provider (e.g. CLIProxyAPI with passthrough-headers):
+  // no OAuth token for the usage endpoint, but each response carries the limits.
+  // The native anthropic / openai-codex providers keep their OAuth query.
+  pi.on("after_provider_response", (event, ctx) => {
+    const model = ctx.model;
+    if (!model || isUsageSupportedModel(model)) return;
+    const report = parseAnthropicRatelimitHeaders(event.headers, Date.now());
+    if (!report) return;
+    rememberHeaderReport(model.provider, report);
+    showHeaderReport(ctx, report);
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
