@@ -281,6 +281,24 @@ export function createUsageStatusline() {
     return true;
   }
 
+  /**
+   * Shows limits taken from response headers (see ratelimit-headers.ts). Nothing
+   * to query: the next provider response brings fresh values, so no refresh and
+   * no clear timer. Between responses the text ages with an "(… old)" suffix.
+   */
+  function showHeaderReport(ctx: ExtensionContext, report: UsageReport): void {
+    statuslineRequestId += 1;
+    clearStatuslineTimers();
+    const render = () => {
+      const text = formatUsageStatusline(report);
+      const ageMs = Date.now() - report.capturedAt;
+      return ageMs > CACHE_TTL_MS ? `${text} (${formatAgeShort(ageMs)} old)` : text;
+    };
+    if (!setStatuslineValue(ctx, render())) return;
+    activeStatuslineContext = ctx;
+    scheduleStatuslineTick(ctx, report, render);
+  }
+
   function setStatuslineChecking(ctx: ExtensionContext): boolean {
     clearStatuslineTick();
     return setStatuslineValue(ctx, "checking");
@@ -298,6 +316,7 @@ export function createUsageStatusline() {
     clearUsageStatusline,
     refreshCurrentUsageStatusline,
     applyCurrentProviderStatusline,
+    showHeaderReport,
     setStatuslineChecking,
     clearStatuslineValue,
   };

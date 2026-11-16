@@ -17,6 +17,10 @@ usage / rate-limit budgets — OpenAI Codex, Anthropic OAuth, and pi-auth-backed
   same in every time zone.
 - Lists Anthropic model-scoped weekly limits (the `limits` entries with a `scope`, e.g. Fable) in
   `/usage` and in the statusline.
+- Shows Claude limits for providers other than `anthropic` (e.g. a proxy such as CLIProxyAPI
+  with `passthrough-headers: true`) from the `anthropic-ratelimit-unified-*` headers of each
+  response. Detected automatically, no configuration; the statusline updates on every response.
+  Headers carry only the 5h / 7d windows, not model-scoped limits or extra usage.
 - Shows the next Codex banked-reset expiry and supports confirmed, interactive consumption.
 
 ## Commands
@@ -73,6 +77,7 @@ Or, for local development, point at the file directly:
 | `src/codex-reset-credits.ts` | Banked reset list/consume/format |
 | `src/normalize-codex.ts` | Codex backend + app-server payload normalization |
 | `src/normalize-anthropic.ts` | Anthropic usage payload normalization |
+| `src/ratelimit-headers.ts` | Anthropic limits from `anthropic-ratelimit-unified-*` response headers |
 | `src/format.ts` | Report/statusline formatting and display |
 | `src/shared-cache.ts` | On-disk shared usage cache |
 | `src/models.ts` | Provider/model matching helpers |

@@ -233,7 +233,7 @@ function formatAnthropicRollingWindow(
   return `${label}: ${progressBarUsed(window.usedPercent)} ${window.usedPercent.toFixed(0)}% used${reset}`;
 }
 
-function formatIsoReset(value: string, showDay = true): string {
+export function formatIsoReset(value: string, showDay = true): string {
   const reset = new Date(value);
   if (Number.isNaN(reset.getTime())) return "at an unknown time";
   const now = new Date();

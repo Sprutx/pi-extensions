@@ -43,7 +43,8 @@ export type CodexUsageReport = {
 
 export type AnthropicUsageReport = {
   provider: "anthropic";
-  source: "anthropic-oauth";
+  /** `anthropic-headers`: from `anthropic-ratelimit-unified-*` response headers, see ratelimit-headers.ts. */
+  source: "anthropic-oauth" | "anthropic-headers";
   capturedAt: number;
   summaryLines: string[];
   /** Pre-rendered statusline; used as-is when `statusWindows` is absent (e.g. cached by older versions). */
