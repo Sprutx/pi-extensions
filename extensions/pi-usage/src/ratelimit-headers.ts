@@ -13,6 +13,12 @@ import { clampPercent } from "./utils.js";
 const PREFIX = "anthropic-ratelimit-unified-";
 const WINDOW_ORDER = ["5h", "7d"];
 
+/** Display names for header windows, matching the OAuth path ("fable 7%" / "Fable 7d").
+ * `7d_oi` is the Fable-only weekly window (CLIProxyAPI scopes its rejections to Fable). */
+const WINDOW_LABELS: Record<string, { status: string; summary: string }> = {
+  "7d_oi": { status: "fable", summary: "Fable 7d" },
+};
+
 /** Headers as pi passes them to `after_provider_response`: lower-case names. */
 export type ResponseHeaders = Record<string, string | undefined>;
 
@@ -48,7 +54,7 @@ export function parseAnthropicRatelimitHeaders(
   windows.sort((left, right) => windowRank(left.key) - windowRank(right.key) || left.key.localeCompare(right.key));
 
   const statusWindows: AnthropicStatusWindow[] = windows.map((window) => ({
-    text: `${window.key} ${window.usedPercent.toFixed(0)}%${isLimited(window.status) ? " limited" : ""}`,
+    text: `${WINDOW_LABELS[window.key]?.status ?? window.key} ${window.usedPercent.toFixed(0)}%${isLimited(window.status) ? " limited" : ""}`,
     resetsAt: window.resetsAt,
   }));
 
@@ -57,7 +63,7 @@ export function parseAnthropicRatelimitHeaders(
     const reset = window.resetsAt ? ` (resets ${formatIsoReset(window.resetsAt, window.key !== "5h")})` : "";
     const status = isLimited(window.status) ? ` [${window.status}]` : "";
     lines.push(
-      `  ${window.key}: ${progressBarUsed(window.usedPercent)} ${window.usedPercent.toFixed(0)}% used${reset}${status}`,
+      `  ${WINDOW_LABELS[window.key]?.summary ?? window.key}: ${progressBarUsed(window.usedPercent)} ${window.usedPercent.toFixed(0)}% used${reset}${status}`,
     );
   }
   const overall = values.get("status");
