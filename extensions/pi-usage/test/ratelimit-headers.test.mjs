@@ -57,6 +57,20 @@ test("utilization is a fraction; windows come in 5h, 7d order with resets", () =
   assert.ok(report.summaryLines.some((line) => line.startsWith("  5h: [") && line.includes("2% used (resets 20:30)")));
 });
 
+test("the 7d_oi window is shown as Fable, like the OAuth path", () => {
+  const report = parseAnthropicRatelimitHeaders(
+    {
+      ...HEADERS,
+      "anthropic-ratelimit-unified-7d_oi-reset": epoch("2026-11-22T04:00:00Z"),
+      "anthropic-ratelimit-unified-7d_oi-status": "allowed",
+      "anthropic-ratelimit-unified-7d_oi-utilization": "0.02",
+    },
+    NOW,
+  );
+  assert.equal(report.statusline, "claude 5h 2% ↻2h20m / 7d 6% fable 2% ↻5d9h");
+  assert.ok(report.summaryLines.some((line) => line.startsWith("  Fable 7d: [") && line.includes("2% used")));
+});
+
 test("overage headers are not windows", () => {
   const report = parseAnthropicRatelimitHeaders(HEADERS, NOW);
   assert.equal(report.statusWindows.length, 2);
